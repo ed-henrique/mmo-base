@@ -1,0 +1,5 @@
+#define PORT 8080
+#define PACKET_SIZE 1024
+
+#define MAX_CLIENTS 512
+
