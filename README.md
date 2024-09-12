@@ -6,6 +6,27 @@ Extensible base server and client for MMO with batteries.
 
 - Chooses the best protocol for communicating for every action.
 
+## How to Build from Source
+
+1. Clone the repo;
+
+```bash
+git clone https://github.com/ed-henrique/mmo-base
+cd mmo-base
+```
+
+2. Install dependencies;
+
+```bash
+sudo apt install protobuf-c-compiler libprotobuf-c-dev
+```
+
+3. Run the script to build the binaries;
+
+```bash
+make dev
+```
+
 ## Roadmap
 
 - [ ] View Map

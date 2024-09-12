@@ -1,6 +1,8 @@
 #ifndef MODELS_H
 #define MODELS_H
 
+#include "proto/message.pb-c.h"
+
 #ifndef NAME_SIZE
 #define NAME_SIZE 64
 #endif
@@ -14,9 +16,8 @@
 #endif
 
 typedef enum action {
-  MOVE,
-  HEAL,
-  ATTACK
+  CHAT,
+  MOVE
 } Action;
 
 typedef struct player {
@@ -54,53 +55,15 @@ typedef struct guild {
   int members[MAX_GUILD_SIZE];
 } Guild;
 
-typedef struct privatechat {
+typedef struct chat {
   // Identity
   int id;
   int sender;
-  int receiver;
+  int recipient;
 
   // Stats
-  char message[MESSAGE_SIZE];
-} PrivateChat;
-
-typedef struct partychat {
-  // Identity
-  int id;
-  int party;
-  int sender;
-
-  // Stats
-  char message[MESSAGE_SIZE];
-} PartyChat;
-
-typedef struct guildchat {
-  // Identity
-  int id;
-  int guild;
-  int sender;
-
-  // Stats
-  char message[MESSAGE_SIZE];
-} GuildChat;
-
-typedef struct localchat {
-  // Identity
-  int id;
-  int local;
-  int sender;
-
-  // Stats
-  char message[MESSAGE_SIZE];
-} LocalChat;
-
-typedef struct globalchat {
-  // Identity
-  int id;
-  int sender;
-
-  // Stats
-  char message[MESSAGE_SIZE];
-} GlobalChat;
+  Msg__V1__ChatMessage__Scope scope;
+  char content[MESSAGE_SIZE];
+} Chat;
 
 #endif /* MODELS_H */

@@ -1,10 +1,11 @@
 #include "models.h"
 #include "network.h"
-#include "utils/logger.h"
+#include "proto/message.pb-c.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +28,7 @@ Servers init() {
     exit(EXIT_FAILURE);
   }
 
-  flog_info("sockets are udp=%d tcp=%d", sockfd_udp, sockfd_tcp);
+  printf("sockets are udp=%d tcp=%d\n", sockfd_udp, sockfd_tcp);
 
   memset(&addr, 0, sizeof(addr));
 
@@ -68,17 +69,29 @@ Servers init() {
   return ss;
 }
 
-int recvudp(Server *s, struct sockaddr_in *c, void *restrict buffer,
-            size_t buffersize) {
+ssize_t recvudp(Server *s, struct sockaddr_in *c, void *restrict buffer,
+                size_t buffersize) {
   return recvfrom(s->sockfd, buffer, buffersize, 0, (struct sockaddr *)c,
                   (socklen_t *restrict)sizeof(*c));
 }
 
-int recvtcp(ClientTCP *c, void *restrict buffer, size_t buffersize) {
+ssize_t recvtcp(ClientTCP *c, void *restrict buffer, size_t buffersize) {
   return recv(c->sockfd, buffer, buffersize, 0);
 }
 
-void remove_closed_tcp_conns(ClientTCP tcpcs[MAX_CLIENTS], int *active_tcp_conns, int i) {
+Msg__V1__ChatMessage *unpack_chat_message(uint8_t *buffer, size_t len) {
+  return msg__v1__chat_message__unpack(NULL, len, (const uint8_t *)buffer);
+}
+
+void log_chat_message(uint8_t *buffer, size_t len) {
+  Msg__V1__ChatMessage *msg = unpack_chat_message(buffer, len);
+  printf("(Scope %d) Player %lu sent message '%s' to %lu\n", msg->scope,
+            msg->sender, msg->content, msg->recipient);
+  msg__v1__chat_message__free_unpacked(msg, NULL);
+}
+
+void remove_closed_tcp_conns(ClientTCP tcpcs[MAX_CLIENTS],
+                             int *active_tcp_conns, int i) {
   close(tcpcs[i].sockfd);
 
   for (int j = i; j < *active_tcp_conns; j++) {
@@ -91,9 +104,11 @@ void remove_closed_tcp_conns(ClientTCP tcpcs[MAX_CLIENTS], int *active_tcp_conns
 int main() {
   fd_set readfds;
   Servers ss = init();
-  char buffer[PACKET_SIZE];
+  // uint8_t buffer[PACKET_SIZE];
   ClientTCP tcpcs[MAX_CLIENTS];
-  int n, ns, max_sd, activity;
+  size_t n;
+  uint32_t msglen;
+  int ns, max_sd, activity;
 
   struct timeval timeout;
   timeout.tv_sec = 0;
@@ -121,7 +136,7 @@ int main() {
     activity = select(max_sd + 1, &readfds, NULL, NULL, &timeout);
 
     if (activity < 0 && errno != EINTR) {
-      log_error("There was an error when selecting the socket");
+      puts("There was an error when selecting the socket");
     }
 
     if (FD_ISSET(ss.udp->sockfd, &readfds)) {
@@ -144,16 +159,40 @@ int main() {
 
     for (int i = 0; i < active_tcp_conns; i++) {
       if (FD_ISSET(tcpcs[i].sockfd, &readfds)) {
-        n = recvtcp(&tcpcs[i], buffer, PACKET_SIZE);
+        n = recvtcp(&tcpcs[i], &msglen, sizeof(msglen));
 
-        if (n == 0) {
-          log_info("Client disconnected");
+        if (n <= 0) {
+          puts("Client disconnected");
           remove_closed_tcp_conns(tcpcs, &active_tcp_conns, i);
           i--;
-        } else {
-          buffer[n] = '\0';
-          log_info(buffer);
+          continue;
         }
+
+        msglen = ntohl(msglen);
+        uint8_t *recvbuffer = malloc(msglen);
+        if (recvbuffer == NULL) {
+          puts("Client disconnected");
+          remove_closed_tcp_conns(tcpcs, &active_tcp_conns, i);
+          i--;
+          continue;
+        }
+
+        size_t bytes_recvd = 0;
+        while (bytes_recvd < msglen) {
+          n = recvtcp(&tcpcs[i], recvbuffer + bytes_recvd,
+                      msglen - bytes_recvd);
+          if (n <= 0) {
+            free(recvbuffer);
+            puts("Client disconnected");
+            remove_closed_tcp_conns(tcpcs, &active_tcp_conns, i);
+            i--;
+            continue;
+          }
+
+          bytes_recvd += n;
+        }
+
+        log_chat_message(recvbuffer, msglen);
       }
     }
   }

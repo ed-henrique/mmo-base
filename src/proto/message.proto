@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package msg.v1;
+
+message ChatMessage {
+  enum Scope {
+    PRIVATE = 0;
+    PARTY   = 1;
+    GUILD   = 2;
+    LOCAL   = 3;
+    GLOBAL  = 4;
+  }
+
+  Scope  scope     = 1;
+  uint64 sender    = 2;
+  uint64 recipient = 3;
+  string content   = 4;
+}
+
+message MoveMessage {
+  uint64 id  = 1;
+  uint64 map = 2;
+  uint64 x   = 3;
+  string y   = 4;
+}
