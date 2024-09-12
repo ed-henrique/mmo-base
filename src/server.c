@@ -4,6 +4,8 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <signal.h>
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -13,6 +15,13 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+static void signal_handler(int sig) {
+  if (sig == SIGINT) {
+    printf("Shutting down...\n");
+    exit(EXIT_FAILURE);
+  }
+}
 
 Servers init() {
   int sockfd_udp, sockfd_tcp;
@@ -86,7 +95,7 @@ Msg__V1__ChatMessage *unpack_chat_message(uint8_t *buffer, size_t len) {
 void log_chat_message(uint8_t *buffer, size_t len) {
   Msg__V1__ChatMessage *msg = unpack_chat_message(buffer, len);
   printf("(Scope %d) Player %lu sent message '%s' to %lu\n", msg->scope,
-            msg->sender, msg->content, msg->recipient);
+         msg->sender, msg->content, msg->recipient);
   msg__v1__chat_message__free_unpacked(msg, NULL);
 }
 
@@ -102,9 +111,14 @@ void remove_closed_tcp_conns(ClientTCP tcpcs[MAX_CLIENTS],
 }
 
 int main() {
+  struct sigaction sigact;
+  sigact.sa_handler = signal_handler;
+  sigemptyset(&sigact.sa_mask);
+  sigact.sa_flags = 0;
+  sigaction(SIGINT, &sigact, (struct sigaction *)NULL);
+
   fd_set readfds;
   Servers ss = init();
-  // uint8_t buffer[PACKET_SIZE];
   ClientTCP tcpcs[MAX_CLIENTS];
   size_t n;
   uint32_t msglen;
