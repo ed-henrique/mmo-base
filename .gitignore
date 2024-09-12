@@ -55,3 +55,6 @@ dkms.conf
 # LSP specific
 .cache/
 compile_commands.json
+
+# Userspace config
+.env
